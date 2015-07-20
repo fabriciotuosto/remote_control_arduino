@@ -121,7 +121,8 @@ void configureServer() {
 }
 
 void logMessages(String messages[]) {
-  for (int i = 0; i < sizeof(messages); i++) {
+  int size = sizeof(messages)/sizeof(String);
+  for (int i = 0; i < size; i++) {
     Serial.print(messages[i]);
   }
   Serial.println("");
@@ -206,7 +207,8 @@ String command(String command, String expected, String expected2, int timeout) {
 
     String composeRequest(String elements[]) {
       String result = "";
-      for (int i = 0; i < sizeof(elements); i++) {
+      int size = sizeof(elements)/sizeof(String);
+      for (int i = 0; i < size; i++) {
         result += elements[i];
       }
       return result;
