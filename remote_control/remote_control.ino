@@ -62,10 +62,10 @@ void setup() {
   wifi.begin(SPEED);
   delay(10);
   configure();
-}  
+}
 
 void loop() {
-  if(wifi.available()) {
+  if (wifi.available()) {
     listen();
   }
 }
@@ -102,8 +102,8 @@ void findEndpoint() {
 
 void configureEndpoint() {
   String cmd = "";
-  cmd+= COMMAND_JAP;
-  cmd+= "\"La Maldicion de Mandos\",\"spuenci1\"\r\n";
+  cmd += COMMAND_JAP;
+  cmd += "\"La Maldicion de Mandos\",\"spuenci1\"\r\n";
   command(cmd, OK, NOTHING, 5000);
 }
 
@@ -113,207 +113,197 @@ void getIp() {
 }
 
 void configureMux() {
-  command(COMMAND_MUX, OK, NOTHING, 500); 
-}  
+  command(COMMAND_MUX, OK, NOTHING, 500);
+}
 
 void configureServer() {
   command(COMMAND_SERVER, OK, NOTHING, 1000);
+}
+
+void logMessages(String messages[]) {
+  for (int i = 0; i < sizeof(messages); i++) {
+    Serial.print(messages[i]);
+  }
+  Serial.println("");
 }
 
 String command(String command, String expected, String expected2, int timeout) {
   String text = send(command, timeout);
   if (!expected2.equals(NOTHING)) {
     if (!has(text, expected) && !has(text, expected2)) {
-      Serial.print(command);
-      Serial.print(" No responde ni ");
-      Serial.print(expected);
-      Serial.print(" ni ");
-      Serial.print(expected2);
-      Serial.println(" :(");
-    }
-  } else {
-    if(!has(text, expected)) {
-      Serial.print(command);
-      Serial.print(" No responde ");
-      Serial.print(expected);
-      Serial.println(" :(");
-    }
-  }
-  return text;
-}
-
-void listen() {
-  if (wifi.find(HTTP_INIT)) {
-    processRequest(); 
-  } else {
-    load(500);
-  } 
-}
-
-void processRequest() {
-  String cip = wifi.readStringUntil(CHAR_COMMA);
-  wifi.find(COLON);
-  String method = wifi.readStringUntil(CHAR_SPACE);
-  String message;
-  wifi.find(SLASH);
-  if (method.equals(HTTP_PUT)) {
-    message = putRequest();
-  } else if (method.equals(HTTP_GET)) {
-    message = getRequest();
-  } else {
-    message = HTTP_BAD_RESPONSE;
-  }
-  load(500);
-  int messageSize = message.length();
-  wifi.print(COMMAND_SEND);
-  wifi.print(cip);
-  wifi.print(COMMA);
-  wifi.println(messageSize);
-  if (wifi.find(RES_WAIT)) {
-    wifi.println(message);
-    Serial.println("Send:");
-    Serial.println(message);
-    if(wifi.find("SEND OK")) {
-      Serial.println("SEND OK closing");
-      wifi.print(COMMAND_CLOSE);
-      wifi.println(cip);
-    }
-  }
-}
-
-String putRequest() {
-  String command = wifi.readStringUntil(CHAR_SLASH);
-  if (String(REQ_LED).equals(command)) {
-    return led();
-  }  
-  return HTTP_BAD_RESPONSE;
-}
-
-String getRequest() {
-  String command = wifi.readStringUntil(CHAR_SLASH);
-  if (String(REQ_PING).equals(command)) {
-    return ping();
-  }
-  if (String(REQ_LEDS).equals(command)) {
-    return leds();
-  }
-  if (String(REQ_STATUS).equals(command)) {
-    return ledStatus();
-  }
-  return HTTP_BAD_RESPONSE;
-}
-
-String header(String code, String body) {
-  String header = "";
-  header+= code;
-  header+= String(body.length());
-  header+= HTTP_END_HEAD;
-  header+= body;
-  return header;
-}
-
-String headerOk(String body) {
-  String header = "";
-  header+= HTTP_HEAD;
-  header+= String(body.length());
-  header+= HTTP_END_HEAD;
-  header+= body;
-  return header;
-}
-
-String headerNoChange(String body) {
-  String header = "";
-  header+= HTTP_HEAD_NO_CHANGE;
-  header+= String(body.length());
-  header+= HTTP_END_HEAD;
-  header+= body;
-  return header;
-}
-
-String headerBad() {
-  return HTTP_BAD_RESPONSE;
-}
-
-String ping() {
-  return headerOk(NOTHING);
-}
-
-String leds() {
-  String response = "[";
-  response+= LED;
-  response+= "]";
-  return headerOk(response); 
-}
-
-String ledStatus() {
-  String ledString = wifi.readStringUntil(CHAR_SPACE);
-  int led = ledString.toInt();
-  if (led == LED) {
-    String state = OFF;
-    if (ledList[led] == HIGH) {
-      state = ON;
-    }
-    return headerOk(state);
-  }
-  return headerBad();
-}
-
-String led() {
-  String ledString = wifi.readStringUntil(CHAR_SLASH);
-  String comm = wifi.readStringUntil(CHAR_SPACE);
-  int led = ledString.toInt();
-  if (led == LED) {
-    String state = OFF;
-    if (ledList[led] == HIGH) {
-      state = ON;
-    }
-    if (state.equals(comm)) {
-      return headerNoChange("");
+      String to_log[6] = { command, "No responde ni", expected, "ni", expected2, " :(" };
+      logMessages(to_log);
+      }
     } else {
-      if (ledList[led] == HIGH) {
-        digitalWrite(led, LOW);
-        ledList[led] = LOW;
+      if (!has(text, expected)) {
+        String to_log[4] = { command, "No responde", expected, " :("};
+        logMessages(to_log);
+        }
+      }
+      return text;
+    }
+
+    void listen() {
+      if (wifi.find(HTTP_INIT)) {
+        processRequest();
       } else {
-        digitalWrite(led, HIGH);
-        ledList[led] = HIGH;  
+        load(500);
       }
     }
-    return headerOk("");
-  }
-  return headerBad();
-}
 
-String send(String command, const int timeout) {
-  return sendData(command, timeout, true);
-}
-
-String sendData(String command, const int timeout, boolean debug) {
-    wifi.print(command); // send the read character to the esp8266
-    return load(timeout);
-}
-
-String load(const int timeout) {
-  String text = "";
-  long int time = millis();
-    while( (time+timeout) > millis())
-    {
-      while(wifi.available())
-      {   
-        // The esp has data so display its output to the serial window 
-        char c = wifi.read(); // read the next character.
-        text+=c;
-      }  
+    void processRequest() {
+      String cip = wifi.readStringUntil(CHAR_COMMA);
+      wifi.find(COLON);
+      String method = wifi.readStringUntil(CHAR_SPACE);
+      String message;
+      wifi.find(SLASH);
+      if (method.equals(HTTP_PUT)) {
+        message = putRequest();
+      } else if (method.equals(HTTP_GET)) {
+        message = getRequest();
+      } else {
+        message = HTTP_BAD_RESPONSE;
+      }
+      load(500);
+      int messageSize = message.length();
+      wifi.print(COMMAND_SEND);
+      wifi.print(cip);
+      wifi.print(COMMA);
+      wifi.println(messageSize);
+      if (wifi.find(RES_WAIT)) {
+        wifi.println(message);
+        String to_log[2] = {"Send:", message};
+        logMessages(to_log);
+        if (wifi.find("SEND OK")) {
+          Serial.println("SEND OK closing");
+          wifi.print(COMMAND_CLOSE);
+          wifi.println(cip);
+        }
+      }
     }
-    Serial.print(text);
-    return text;
-}
 
-boolean has(String text, String search) {
-  return text.indexOf(search) >= 0; 
-}
+    String putRequest() {
+      String command = wifi.readStringUntil(CHAR_SLASH);
+      if (String(REQ_LED).equals(command)) {
+        return led();
+      }
+      return HTTP_BAD_RESPONSE;
+    }
 
-String findIp(String text) {
-  int index = text.indexOf("STAIP,\"") + 7;
-  String beginIp = text.substring(index);
-  return beginIp.substring(0, beginIp.indexOf("\""));
-}
+    String getRequest() {
+      String command = wifi.readStringUntil(CHAR_SLASH);
+      if (String(REQ_PING).equals(command)) {
+        return ping();
+      }
+      if (String(REQ_LEDS).equals(command)) {
+        return leds();
+      }
+      if (String(REQ_STATUS).equals(command)) {
+        return ledStatus();
+      }
+      return HTTP_BAD_RESPONSE;
+    }
+
+    String composeRequest(String elements[]) {
+      String result = "";
+      for (int i = 0; i < sizeof(elements); i++) {
+        result += elements[i];
+      }
+      return result;
+    }
+
+    String header(String code, String body) {
+      String elements[4]  = { code, String(body.length()), HTTP_END_HEAD, body };
+      return composeRequest(elements);
+    }
+
+    String headerOk(String body) {
+      String elements[4]  = { HTTP_HEAD, String(body.length()), HTTP_END_HEAD, body };
+      return composeRequest(elements);
+    }
+
+    String headerNoChange(String body) {
+      String elements[4]  = { HTTP_HEAD_NO_CHANGE, String(body.length()), HTTP_END_HEAD, body };
+      return composeRequest(elements);
+    }
+
+    String headerBad() {
+      return HTTP_BAD_RESPONSE;
+    }
+
+    String ping() {
+      return headerOk(NOTHING);
+    }
+
+    String leds() {
+      return headerOk("[" + String(LED) + "]");
+    }
+
+    String ledStatus(int led) {
+      return ledList[led] == HIGH ? ON : OFF;
+    }
+    String ledStatus() {
+      String ledString = wifi.readStringUntil(CHAR_SPACE);
+      int led = ledString.toInt();
+      if (led == LED) {
+        return headerOk(ledStatus(led));
+      }
+      return headerBad();
+    }
+
+    String led() {
+      String ledString = wifi.readStringUntil(CHAR_SLASH);
+      String comm = wifi.readStringUntil(CHAR_SPACE);
+      int led = ledString.toInt();
+      if (led == LED) {
+        String state = ledStatus(led);
+        if (state.equals(comm)) {
+          return headerNoChange("");
+        } else {
+          if (ledList[led] == HIGH) {
+            digitalWrite(led, LOW);
+            ledList[led] = LOW;
+          } else {
+            digitalWrite(led, HIGH);
+            ledList[led] = HIGH;
+          }
+        }
+        return headerOk("");
+      }
+      return headerBad();
+    }
+
+    String send(String command, const int timeout) {
+      return sendData(command, timeout, true);
+    }
+
+    String sendData(String command, const int timeout, boolean debug) {
+      wifi.print(command); // send the read character to the esp8266
+      return load(timeout);
+    }
+
+    String load(const int timeout) {
+      String text = "";
+      long int time = millis();
+      while ( (time + timeout) > millis())
+      {
+        while (wifi.available())
+        {
+          // The esp has data so display its output to the serial window
+          char c = wifi.read(); // read the next character.
+          text += c;
+        }
+      }
+      Serial.print(text);
+      return text;
+    }
+
+    boolean has(String text, String search) {
+      return text.indexOf(search) >= 0;
+    }
+
+    String findIp(String text) {
+      int index = text.indexOf("STAIP,\"") + 7;
+      String beginIp = text.substring(index);
+      return beginIp.substring(0, beginIp.indexOf("\""));
+    }
